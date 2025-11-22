@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace XDM.Core.Downloader
+namespace XDM.Core.Collections
 {
     public class WorkStealingQueue<T>
     {
@@ -20,7 +20,5 @@ namespace XDM.Core.Downloader
         {
             return _queue.TryDequeue(out item);
         }
-
-        public bool IsEmpty => _queue.IsEmpty;
     }
 }

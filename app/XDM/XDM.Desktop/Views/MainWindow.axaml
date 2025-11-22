@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:XDM.Desktop.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="XDM.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="XDM.Desktop">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid ColumnDefinitions="250, *">
+        <!-- Sidebar -->
+        <StackPanel Grid.Column="0" Background="#2D2D30">
+            <Button Content="All Downloads" Margin="10" />
+            <Button Content="Video" Margin="10" />
+            <Button Content="Settings" Margin="10" />
+        </StackPanel>
+
+        <!-- Content -->
+        <ListBox Grid.Column="1" ItemsSource="{Binding Downloads}">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="10">
+                        <TextBlock Text="{Binding Filename}" FontWeight="Bold" />
+                        <ProgressBar Value="{Binding Progress}" />
+                        <TextBlock Text="{Binding Status}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</Window>

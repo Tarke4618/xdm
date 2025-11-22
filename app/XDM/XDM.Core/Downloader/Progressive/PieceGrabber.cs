@@ -8,7 +8,6 @@ using TraceLog;
 using XDM.Core.Clients.Http;
 using System.Linq;
 using Microsoft.Win32.SafeHandles;
-using System.IO.RandomAccess;
 
 namespace XDM.Core.Downloader.Progressive
 {

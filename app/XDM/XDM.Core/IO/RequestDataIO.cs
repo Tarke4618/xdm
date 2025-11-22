@@ -1,13 +1,13 @@
-﻿using System;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using TraceLog;
 using XDM.Core.Downloader.Adaptive.Dash;
 using XDM.Core.Downloader.Adaptive.Hls;
 using XDM.Core.Downloader.Progressive.DualHttp;
 using XDM.Core.Downloader.Progressive.SingleHttp;
-using XDM.Messaging;
+using XDM.Core.IO;
 
 namespace XDM.Core.IO
 {

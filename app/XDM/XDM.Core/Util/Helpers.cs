@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -18,7 +18,6 @@ using XDM.Core.Downloader.Progressive.DualHttp;
 using XDM.Core.Downloader.Adaptive.Hls;
 using XDM.Core.Downloader.Progressive.SingleHttp;
 using XDM.Core.Downloader;
-using XDM.Messaging;
 
 #if !NET5_0_OR_GREATER
 using XDM.Compatibility;

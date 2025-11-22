@@ -28,7 +28,6 @@ namespace XDM.Core.Clients.Http
             {
                 AutomaticDecompression = DecompressionMethods.All,
                 PreAuthenticate = true,
-                UseDefaultCredentials = true,
                 MaxConnectionsPerServer = 100,
                 SslOptions = new SslClientAuthenticationOptions
                 {

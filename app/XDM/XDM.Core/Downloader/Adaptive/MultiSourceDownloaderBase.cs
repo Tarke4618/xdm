@@ -13,8 +13,8 @@ using XDM.Core.IO;
 using XDM.Compatibility;
 #endif
 using System.Text;
-using System.IO.RandomAccess;
 using Microsoft.Win32.SafeHandles;
+using XDM.Core.Collections;
 
 namespace XDM.Core.Downloader.Adaptive
 {
@@ -517,7 +517,7 @@ namespace XDM.Core.Downloader.Adaptive
             WriteChunkState(_chunks, w);
             ms.CopyTo(stream);
 #else
-            using var w = a new BinaryWriter(stream, Encoding.UTF8, true);
+            using var w = new BinaryWriter(stream, Encoding.UTF8, true);
             WriteChunkState(_chunks, w);
 #endif
         }

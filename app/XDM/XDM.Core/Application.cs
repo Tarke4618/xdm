@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using TraceLog;
@@ -26,7 +26,8 @@ namespace XDM.Core
 
         private void AppInstance_Initialized(object? sender, EventArgs e)
         {
-            AppDB.Instance.Init(Path.Combine(Config.AppDir, "downloads.db"));
+            AppDB.Instance.Init(
+                Path.Combine(Config.AppDir, "downloads.db"));
             AttachedEventHandler();
             LoadDownloadList();
             UpdateToolbarButtonState();

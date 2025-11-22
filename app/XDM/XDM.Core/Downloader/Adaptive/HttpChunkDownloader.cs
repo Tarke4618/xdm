@@ -8,7 +8,6 @@ using XDM.Core;
 using XDM.Core.Util;
 using XDM.Core.Clients.Http;
 using Microsoft.Win32.SafeHandles;
-using System.IO.RandomAccess;
 
 namespace XDM.Core.Downloader.Adaptive
 {

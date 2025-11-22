@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -36,7 +36,7 @@ namespace XDM.Core
         private GenericOrderedDictionary<string, bool> queuedDownloads = new();
         private GenericOrderedDictionary<string, IProgressWindow> activeProgressWindows = new();
         private Scheduler scheduler;
-        private Timer awakePingTimer;
+        private System.Timers.Timer awakePingTimer;
         public int ActiveDownloadCount { get => liveDownloads.Count + queuedDownloads.Count; }
 
         public ApplicationCore()
@@ -46,7 +46,7 @@ namespace XDM.Core
 
         private void AppInstance_Initialized(object sender, EventArgs e)
         {
-            awakePingTimer = new Timer(60000)
+            awakePingTimer = new System.Timers.Timer(60000)
             {
                 AutoReset = true
             };
