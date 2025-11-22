@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -7,6 +7,8 @@ using TraceLog;
 using XDM.Core;
 using XDM.Core.Util;
 using XDM.Core.Clients.Http;
+using Microsoft.Win32.SafeHandles;
+using System.IO.RandomAccess;
 
 namespace XDM.Core.Downloader.Adaptive
 {
@@ -24,6 +26,7 @@ namespace XDM.Core.Downloader.Adaptive
         protected Dictionary<string, List<string>> headers;
         protected string cookies;
         protected AuthenticationInfo? authentication;
+        private readonly SafeFileHandle? _fileHandle;
 
         public event EventHandler<ChunkDownloadedEventArgs>? ChunkDataReceived;
         public event EventHandler<MimeTypeReceivedEventArgs>? MimeTypeReceived;
@@ -35,7 +38,8 @@ namespace XDM.Core.Downloader.Adaptive
             string cookies,
             AuthenticationInfo? authentication,
             IChunkStreamMap chunkStreamMap,
-            ICancelRequster cancelRequster)
+            ICancelRequster cancelRequster,
+            SafeFileHandle? fileHandle) 
         {
             _chunk = chunk;
             _http = http;
@@ -43,6 +47,7 @@ namespace XDM.Core.Downloader.Adaptive
             _cancelRequster = cancelRequster;
             _lastUpdated = Helpers.TickCount();
             downloadedEventArgs = new();
+            _fileHandle = fileHandle;
 
             this.cookies = cookies;
             this.headers = headers;
@@ -55,16 +60,6 @@ namespace XDM.Core.Downloader.Adaptive
         {
             var targetStream = new FileStream(_chunkStreamMap.GetStream(_chunk.Id),
                 FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-            //if (_chunk.Size > 0)
-            //{
-            //    targetStream.Seek(_chunk.Offset + _chunk.Downloaded, SeekOrigin.Begin);
-            //}
-            //else
-            //{
-            //    targetStream.Seek(0, SeekOrigin.Begin);
-            //}
-
-            //since we store each segments in separate file irrespective of byte ranged or not, no need to care about offset
             targetStream.Seek(_chunk.Downloaded, SeekOrigin.Begin);
             return targetStream;
         }
@@ -86,19 +81,9 @@ namespace XDM.Core.Downloader.Adaptive
                     {
                         Log.Debug("Creating request");
                         var request = this._http.CreateGetRequest(_chunk.Uri, this.headers, this.cookies, this.authentication);
-                        //                    HttpRequestMessage request = new HttpRequestMessage
-                        //                    {
-                        //                        Method = HttpMethod.Get,
-                        //                        RequestUri = _chunk.Uri,
-                        //#if NET5_0
-                        //                        Version = HttpVersion.Version20
-                        //#endif
-                        //                    };
-                        if (_chunk.Size > 0) //size of hls chunk without byte range size will be -1
+                        if (_chunk.Size > 0) 
                         {
                             request.AddRange(_chunk.Offset + _chunk.Downloaded, _chunk.Offset + _chunk.Size - 1);
-                            // request.Headers.Range = new RangeHeaderValue(_chunk.Offset + _chunk.Downloaded,
-                            //_chunk.Size > 0 ? _chunk.Offset + _chunk.Size - 1 : null);
                         }
                         else
                         {
@@ -110,15 +95,11 @@ namespace XDM.Core.Downloader.Adaptive
                         Log.Debug("Sent request");
                         _cancellationToken.ThrowIfCancellationRequested();
                         response.EnsureSuccessStatusCode();
-                        //using var response = await _http
-                        //    .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, _cancellationToken)
-                        //    .ConfigureAwait(false);
                         TransientFailure = false;
                         retryCount = 0;
 
                         if (response.StatusCode != HttpStatusCode.PartialContent && (response.StatusCode != HttpStatusCode.OK && _chunk.Downloaded + _chunk.Offset > 0))
                         {
-                            //throw new Exception(response.ReasonPhrase);
                             _cancelRequster.CancelWithFatal(ErrorCode.InvalidResponse);
                             return;
                         }
@@ -141,23 +122,45 @@ namespace XDM.Core.Downloader.Adaptive
                         var stream = response.GetResponseStream();
                         _cancellationToken.ThrowIfCancellationRequested();
                         using var sourceStream = stream;
-                        using var targetStream = PrepareOutStream();
-
-                        while (!_cancellationToken.IsCancellationRequested)
+                        
+                        if (_fileHandle != null)
                         {
-                            int x = sourceStream.Read(buffer, 0, buffer.Length);
-                            _cancellationToken.ThrowIfCancellationRequested();
-                            if (x == 0)
+                            while (!_cancellationToken.IsCancellationRequested)
                             {
-                                _chunk.ChunkState = ChunkState.Finished;
-                                return;
+                                int x = sourceStream.Read(buffer, 0, buffer.Length);
+                                _cancellationToken.ThrowIfCancellationRequested();
+                                if (x == 0)
+                                {
+                                    _chunk.ChunkState = ChunkState.Finished;
+                                    return;
+                                }
+
+                                RandomAccess.Write(_fileHandle, new ReadOnlySpan<byte>(buffer, 0, x), _chunk.Offset + _chunk.Downloaded);
+
+                                _chunk.Downloaded += x;
+                                downloadedEventArgs.Downloaded = x;
+                                ChunkDataReceived?.Invoke(this, downloadedEventArgs);
                             }
-
-                            targetStream.Write(buffer, 0, x);
-
-                            _chunk.Downloaded += x;
-                            downloadedEventArgs.Downloaded = x;
-                            ChunkDataReceived?.Invoke(this, downloadedEventArgs);
+                        }
+                        else
+                        {
+                             using var targetStream = PrepareOutStream();
+                             while (!_cancellationToken.IsCancellationRequested)
+                             {
+                                 int x = sourceStream.Read(buffer, 0, buffer.Length);
+                                 _cancellationToken.ThrowIfCancellationRequested();
+                                 if (x == 0)
+                                 {
+                                     _chunk.ChunkState = ChunkState.Finished;
+                                     return;
+                                 }
+    
+                                 targetStream.Write(buffer, 0, x);
+    
+                                 _chunk.Downloaded += x;
+                                 downloadedEventArgs.Downloaded = x;
+                                 ChunkDataReceived?.Invoke(this, downloadedEventArgs);
+                             }
                         }
                     }
                     catch (Exception e)

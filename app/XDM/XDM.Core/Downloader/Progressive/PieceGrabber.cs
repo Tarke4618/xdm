@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading;
@@ -7,6 +7,8 @@ using XDM.Core;
 using TraceLog;
 using XDM.Core.Clients.Http;
 using System.Linq;
+using Microsoft.Win32.SafeHandles;
+using System.IO.RandomAccess;
 
 namespace XDM.Core.Downloader.Progressive
 {
@@ -18,20 +20,18 @@ namespace XDM.Core.Downloader.Progressive
         private string? pieceId;
         private IPieceCallback? callback;
         private HttpRequest? request;
-        //private readonly byte[] BUF = new byte[32 * 1024];
         private readonly CancelFlag cancellationTokenSource = new();
-        private Stream? fileWriterStream;
         private int timesRetried = 0;
-        private long maxByteRange = 0; //maximum byte range requested by http client,
-                                       //reading past this length will return 0
-                                       //and new request needs to be sent
+        private long maxByteRange = 0;
         private long actualHttpResponseSize = -1;
+        private SafeFileHandle? _fileHandle;
 
         public CancelFlag CancellationToken => cancellationTokenSource;
-        public PieceGrabber(string pieceId, IPieceCallback callback)
+        public PieceGrabber(string pieceId, IPieceCallback callback, SafeFileHandle? fileHandle)
         {
             this.pieceId = pieceId;
             this.callback = callback;
+            _fileHandle = fileHandle;
         }
 
         private void OnComplete()
@@ -119,8 +119,6 @@ namespace XDM.Core.Downloader.Progressive
                     {
                         sleep(Config.Instance.RetryDelay * 1000);
                         CancellationToken.ThrowIfCancellationRequested();
-                        //await Task.Delay(Config.Instance.RetryDelay * 1000,
-                        //    this.CancellationToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -153,7 +151,6 @@ namespace XDM.Core.Downloader.Progressive
             this.sleepHandle.Close();
             this.pieceId = null;
             this.callback = null;
-            try { this.fileWriterStream?.Dispose(); } catch { }
         }
 
         private HttpResponse Connect()
@@ -220,41 +217,20 @@ namespace XDM.Core.Downloader.Progressive
         {
             if (this.callback == null || this.pieceId == null) return;
             var piece = this.callback.GetPiece(this.pieceId);
-            using var sourceStream = response.GetResponseStream();// response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using var sourceStream = response.GetResponseStream();
             CancellationToken.ThrowIfCancellationRequested();
-            //#if NET5_0_OR_GREATER
-            //            await using var sourceStream = await response.Content.ReadAsStreamAsync(CancellationToken).ConfigureAwait(false);
-            //#else
-            //            using var sourceStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            //            CancellationToken.ThrowIfCancellationRequested();
-            //#endif
-            try
+            
+            if (piece.Length > 0)
             {
-                using var targetStream = new FileStream(this.callback.GetPieceFile(this.pieceId), 
-                    FileMode.OpenOrCreate, FileAccess.Write);
-                this.fileWriterStream = targetStream;
-                targetStream.Seek(piece.Downloaded, SeekOrigin.Begin);
-                if (piece.Length > 0)
-                {
-                    CopyWithFixedLength(piece, sourceStream, targetStream);
-                }
-                else
-                {
-                    CopyWithUnknownLength(piece, sourceStream, targetStream);
-                }
-                try
-                {
-                    targetStream.Close();
-                }
-                catch { }
+                CopyWithFixedLength(piece, sourceStream, null);
             }
-            finally
+            else
             {
-                this.fileWriterStream = null;
+                CopyWithUnknownLength(piece, sourceStream, null);
             }
         }
 
-        private void CopyWithFixedLength(Piece piece, Stream sourceStream, Stream targetStream)
+        private void CopyWithFixedLength(Piece piece, Stream sourceStream, Stream? targetStream)
         {
 #if NET35
             var BUF = new byte[32 * 1024];
@@ -290,7 +266,14 @@ namespace XDM.Core.Downloader.Progressive
                     }
                     try
                     {
-                        targetStream.Write(BUF, 0, x);
+                        if (_fileHandle != null)
+                        {
+                            RandomAccess.Write(_fileHandle, new ReadOnlySpan<byte>(BUF, 0, x), piece.Offset + piece.Downloaded);
+                        }
+                        else
+                        {
+                            targetStream.Write(BUF, 0, x);
+                        }
                         count += x;
                     }
                     catch (IOException ioe)
@@ -320,11 +303,11 @@ namespace XDM.Core.Downloader.Progressive
                     Log.Debug("Disable connection reuse");
                     this.request?.Abort();
                 }
-                catch { }//Dont allow to reuse if entire content has not been read
+                catch { }
             }
         }
 
-        private void CopyWithUnknownLength(Piece piece, Stream sourceStream, Stream targetStream)
+        private void CopyWithUnknownLength(Piece piece, Stream sourceStream, Stream? targetStream)
         {
 #if NET35
             var BUF = new byte[32 * 1024];
@@ -345,7 +328,14 @@ namespace XDM.Core.Downloader.Progressive
                     }
                     try
                     {
-                        targetStream.Write(BUF, 0, x);
+                         if (_fileHandle != null)
+                        {
+                            RandomAccess.Write(_fileHandle, new ReadOnlySpan<byte>(BUF, 0, x), piece.Offset + piece.Downloaded);
+                        }
+                        else
+                        {
+                            targetStream.Write(BUF, 0, x);
+                        }
                     }
                     catch (IOException ioe)
                     {
@@ -370,16 +360,6 @@ namespace XDM.Core.Downloader.Progressive
             if (this.callback == null || this.pieceId == null) throw new OperationCanceledException();
             var headerCookieUrl = this.callback.GetHeaderUrlAndCookies(this.pieceId);
             if (headerCookieUrl == null) throw new OperationCanceledException();
-            //if (headerCookieUrl.Value.Headers != null)
-            //{
-            //    foreach (var item in headerCookieUrl.Value.Headers.Keys)
-            //    {
-            //        Log.Debug(item + ": " + headerCookieUrl.Value.Headers[item].First());
-            //    }
-            //}
-            //Log.Debug("Create request with " + headerCookieUrl.Value.Headers?.Count +
-            //    " headers and " +
-            //    headerCookieUrl.Value.Cookies?.Count + " cookies");
             var req = hc.CreateGetRequest(this.redirectUri ?? headerCookieUrl.Value.Url,
                 headerCookieUrl.Value.Headers,
                 headerCookieUrl.Value.Cookies,
@@ -395,43 +375,6 @@ namespace XDM.Core.Downloader.Progressive
             }
             return req;
         }
-
-        //private void SetAuthentication(HttpRequestMessage request, string user, string password)
-        //{
-        //    try
-        //    {
-        //        request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-        //            Convert.ToBase64String(Encoding.UTF8.GetBytes(user + ":" + password)));
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.Debug(ex, "Error setting auth header value: " + this.pieceId);
-        //    }
-        //}
-
-        //private void SetHeader(HttpRequestMessage request, string key, IEnumerable<string> value)
-        //{
-        //    try
-        //    {
-        //        request.Headers.Add(key, value);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.Debug(ex, "Error setting header value: " + this.pieceId);
-        //    }
-        //}
-
-        //private void SetHeader(HttpRequestMessage request, string key, string value)
-        //{
-        //    try
-        //    {
-        //        request.Headers.Add(key, value);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.Debug(ex, "Error setting header value: " + this.pieceId);
-        //    }
-        //}
 
         private ProbeResult CreateProbeResult(HttpResponse response)
         {
@@ -450,23 +393,5 @@ namespace XDM.Core.Downloader.Progressive
         {
             sleepHandle.WaitOne(interval);
         }
-
-        //private HttpWebResponse SendRequest(HttpWebRequest request)
-        //{
-        //    HttpWebResponse response;
-        //    try
-        //    {
-        //        response = (HttpWebResponse)request.GetResponse();
-        //    }
-        //    catch (WebException we)
-        //    {
-        //        if (we.Response == null)
-        //        {
-        //            throw new Exception("Connectivity error");
-        //        }
-        //        response = (HttpWebResponse?)we.Response!;
-        //    }
-        //    return response;
-        //}
     }
 }

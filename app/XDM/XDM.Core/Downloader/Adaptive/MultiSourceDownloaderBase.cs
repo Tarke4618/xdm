@@ -33,6 +33,7 @@ namespace XDM.Core.Downloader.Adaptive
         protected SpeedLimiter speedLimiter = new();
         protected CountdownLatch? countdownLatch;
         private SafeFileHandle? _fileHandle;
+        private readonly WorkStealingQueue<MultiSourceChunk> _workStealingQueue = new WorkStealingQueue<MultiSourceChunk>();
         public bool IsCancelled => _cancellationTokenSource.IsCancellationRequested;
         public string Id { get; private set; }
         public virtual long FileSize => this._state.FileSize;
@@ -151,7 +152,6 @@ namespace XDM.Core.Downloader.Adaptive
             _cancellationTokenSource.Cancel();
             _cancelRequestor?.CancelAll();
             speedLimiter.WakeIfSleeping();
-            //try { this.semaphore?.Release(); } catch { }
             try { this.countdownLatch?.Break(); } catch { }
             try
             {
@@ -188,7 +188,6 @@ namespace XDM.Core.Downloader.Adaptive
 
                     this._cancellationTokenSource.ThrowIfCancellationRequested();
 
-                    Assemble();
                     OnComplete();
                 }
                 catch (OperationCanceledException ex)
@@ -205,11 +204,6 @@ namespace XDM.Core.Downloader.Adaptive
                     Log.Debug(ex, ex.Message);
                     OnFailed(new DownloadFailedEventArgs(ErrorCode.FFmpegNotFound));
                 }
-                //catch (HttpException ex)
-                //{
-                //    Log.Error(ex, ex.Message);
-                //    OnFailed(new DownloadFailedEventArgs(ErrorCode.InvalidResponse));
-                //}
                 catch (Exception ex)
                 {
                     Log.Debug(ex, ex.Message);
@@ -267,7 +261,6 @@ namespace XDM.Core.Downloader.Adaptive
                     throw new OperationCanceledException();
                 }
 
-                Assemble();
                 OnComplete();
             }
             catch (OperationCanceledException ex)
@@ -275,11 +268,6 @@ namespace XDM.Core.Downloader.Adaptive
                 Console.WriteLine(ex);
                 OnCancelled();
             }
-            //catch (HttpException ex)
-            //{
-            //    Console.WriteLine(ex);
-            //    OnFailed(new DownloadFailedEventArgs(ErrorCode.InvalidResponse));
-            //}
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
@@ -305,64 +293,31 @@ namespace XDM.Core.Downloader.Adaptive
             var probeEventHandler = Probed;
             probeEventHandler?.Invoke(this, EventArgs.Empty);
         }
-
-        private void DownloadChunkRange(int startIndex, int endIndex, CountdownLatch latch)
-        {
-            Log.Debug("Starting thread for range: " + startIndex + " -> " + endIndex);
-
-            var count = 0;
-            new Thread(() =>
-            {
-                Log.Debug("Inside thread");
-                for (var i = startIndex; i <= endIndex; i++)
-                {
-                    if (this._cancellationTokenSource.IsCancellationRequested)
-                    {
-                        break;
-                    }
-                    var chunk = _chunks[i];
-                    if (chunk.ChunkState == ChunkState.Finished)
-                    {
-                        continue;
-                    }
-                    DownloadChunk(chunk, latch);
-                    count++;
-                }
-                Log.Debug("Finished chunk-count: " + count);
-            }).Start();
-        }
-
+        
         private void DownloadChunks()
         {
-            var unfinishedPieceCount = _chunks.Where(chunk => chunk.ChunkState != ChunkState.Finished).Count();
-            if (unfinishedPieceCount < 1) return;
-            SaveChunkState();
-            this.countdownLatch = new(unfinishedPieceCount);
+            var unfinishedChunks = _chunks.Where(chunk => chunk.ChunkState != ChunkState.Finished).ToList();
+            if (!unfinishedChunks.Any()) return;
 
-            Log.Debug("Downloading chunks: " + unfinishedPieceCount);
-
-            var threadCount = Math.Min(unfinishedPieceCount, Config.Instance.MaxSegments);
-            var piecePerThread = (int)Math.Ceiling((float)unfinishedPieceCount / threadCount);
-            var startIndex = 0;
-            var endIndex = 0;
-
-            var m = 0;
-            for (var i = 0; i < _chunks.Count; i++)
+            foreach (var chunk in unfinishedChunks)
             {
-                var chunk = _chunks[i];
-                if (chunk.ChunkState != ChunkState.Finished) m++;
-                if (m == piecePerThread)
-                {
-                    endIndex = i;
-                    DownloadChunkRange(startIndex, endIndex, countdownLatch);
-                    startIndex = i + 1;
-                    m = 0;
-                }
+                _workStealingQueue.Enqueue(chunk);
             }
-            if (m != 0)
+
+            this.countdownLatch = new(unfinishedChunks.Count);
+
+            var threadCount = Math.Min(unfinishedChunks.Count, Config.Instance.MaxSegments);
+
+            for (int i = 0; i < threadCount; i++)
             {
-                endIndex = _chunks.Count - 1;
-                DownloadChunkRange(startIndex, endIndex, countdownLatch);
+                new Thread(() =>
+                {
+                    while (_workStealingQueue.TryDequeue(out var chunk) || _workStealingQueue.TrySteal(out chunk))
+                    {
+                        if (this._cancellationTokenSource.IsCancellationRequested) break;
+                        DownloadChunk(chunk, countdownLatch);
+                    }
+                }).Start();
             }
 
             Log.Debug("Waiting for downloading all chunks");
@@ -447,134 +402,9 @@ namespace XDM.Core.Downloader.Adaptive
             }
         }
 
-        private void ConcatSegments(IEnumerable<string> files, string target)
-        {
-#if NET35
-            var buf = new byte[5 * 1024 * 1024];
-#else
-            var buf = System.Buffers.ArrayPool<byte>.Shared.Rent(5 * 1024 * 1024);
-#endif
-
-            try
-            {
-                var totalSize = 0L;
-                using var fsout = new FileStream(target, FileMode.Create, FileAccess.ReadWrite);
-                foreach (string file in files)
-                {
-                    using var infs = new FileStream(file, FileMode.Open, FileAccess.Read);
-                    while (!this._cancellationTokenSource.IsCancellationRequested)
-                    {
-                        var x = infs.Read(buf, 0, buf.Length);
-                        if (x == 0)
-                        {
-                            break;
-                        }
-                        try
-                        {
-                            fsout.Write(buf, 0, x);
-                        }
-                        catch (IOException ioe)
-                        {
-                            throw new AssembleFailedException(ErrorCode.DiskError, ioe);
-                        }
-                        totalSize += x;
-                    }
-                }
-                this._state.FileSize = totalSize;
-            }
-            finally
-            {
-#if !NET35
-                System.Buffers.ArrayPool<byte>.Shared.Return(buf);
-#endif
-            }
-        }
-
-        protected virtual void Assemble()
-        {
-            SaveChunkState();
-            if (this._cancellationTokenSource.IsCancellationRequested) return;
-            if (string.IsNullOrEmpty(this.TargetDir))
-            {
-                this.TargetDir = FileHelper.GetDownloadFolderByFileName(this.TargetFileName);
-            }
-
-            if (!Directory.Exists(this.TargetDir))
-            {
-                Directory.CreateDirectory(this.TargetDir);
-            }
-
-            if (Config.Instance.FileConflictResolution == FileConflictResolution.AutoRename)
-            {
-                this.TargetFileName = FileHelper.GetUniqueFileName(this.TargetFileName, this.TargetDir);
-            }
-
-            if (!_state.Demuxed)
-            {
-                ConcatSegments(this._chunks.Select(c => this._chunkStreamMap.GetStream(c.Id)), TargetFile);
-                if (this._cancellationTokenSource.IsCancellationRequested) return;
-                DeleteFileParts();
-                return;
-            }
-
-            if (mediaProcessor == null)
-            {
-                throw new AssembleFailedException(ErrorCode.Generic); //TODO: Add more info about error
-            }
-
-            mediaProcessor.ProgressChanged += (s, e) => this.AssembingProgressChanged.Invoke(this, e);
-
-            var videoFile = Path.Combine(_state.TempDirectory, "1_" + TargetFileName + _state.VideoContainerFormat);
-            var audioFile = Path.Combine(_state.TempDirectory, "2_" + TargetFileName + _state.AudioContainerFormat);
-
-            ConcatSegments(this._chunks.Where(c => c.StreamIndex == 0).Select(c => this._chunkStreamMap.GetStream(c.Id)),
-                            videoFile);
-            ConcatSegments(this._chunks.Where(c => c.StreamIndex == 1).Select(c => this._chunkStreamMap.GetStream(c.Id)),
-                audioFile);
-            if (this._cancellationTokenSource.IsCancellationRequested) return;
-
-            var res = mediaProcessor.MergeAudioVideStream(videoFile, audioFile, TargetFile,
-                this._cancellationTokenSource, out long totalSize);
-            if (this._cancellationTokenSource.IsCancellationRequested) return;
-            if (res != MediaProcessingResult.Success)
-            {
-                //try with matroska container
-                var name = Path.GetFileNameWithoutExtension(TargetFileName);
-                TargetFileName = name + ".mkv";
-                this.TargetFileName = FileHelper.GetUniqueFileName(this.TargetFileName, this.TargetDir);
-                if (mediaProcessor.MergeAudioVideStream(videoFile, audioFile, TargetFile,
-                this._cancellationTokenSource, out totalSize) != MediaProcessingResult.Success)
-                {
-                    //try with matroska container
-                    throw new AssembleFailedException(
-                        res == MediaProcessingResult.AppNotFound ? ErrorCode.FFmpegNotFound :
-                                ErrorCode.FFmpegError); //TODO: Add more info about error
-                }
-            }
-
-            if (this._cancellationTokenSource.IsCancellationRequested) return;
-            DeleteFileParts();
-
-            this._state.FileSize = totalSize;
-        }
-
-        private void DeleteFileParts()
-        {
-            Log.Debug("DeleteFileParts...");
-            try
-            {
-                Directory.Delete(_state.TempDirectory, true);
-            }
-            catch (Exception ex)
-            {
-                Log.Debug(ex, "DeleteFileParts");
-            }
-        }
-
         public void SetFileName(string name, FileNameFetchMode fileNameFetchMode)
         {
             this.TargetFileName = FileHelper.SanitizeFileName(name);
-            //this.fileNameFetchMode = fileNameFetchMode;
         }
 
         public void SetTargetDirectory(string folder)
@@ -613,10 +443,11 @@ namespace XDM.Core.Downloader.Adaptive
             try
             {
                 this._http?.Dispose();
+                _fileHandle?.Close();
             }
             catch (Exception ex)
             {
-                Log.Debug(ex, "Exception while disposing http client");
+                Log.Debug(ex, "Exception while cleaning up");
             }
         }
 
@@ -735,13 +566,7 @@ namespace XDM.Core.Downloader.Adaptive
         public bool Demuxed;
         public int AudioChunkCount = 0;
         public int VideoChunkCount = 0;
-        /// <summary>
-        /// Container file extension
-        /// </summary>
         public string VideoContainerFormat = "";
-        /// <summary>
-        /// Container file extension
-        /// </summary>
         public string AudioContainerFormat = "";
 
 
