@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +13,8 @@ using XDM.Core.IO;
 using XDM.Compatibility;
 #endif
 using System.Text;
+using System.IO.RandomAccess;
+using Microsoft.Win32.SafeHandles;
 
 namespace XDM.Core.Downloader.Adaptive
 {
@@ -30,6 +32,7 @@ namespace XDM.Core.Downloader.Adaptive
         protected readonly ProgressResultEventArgs progressResult;
         protected SpeedLimiter speedLimiter = new();
         protected CountdownLatch? countdownLatch;
+        private SafeFileHandle? _fileHandle;
         public bool IsCancelled => _cancellationTokenSource.IsCancellationRequested;
         public string Id { get; private set; }
         public virtual long FileSize => this._state.FileSize;
@@ -243,18 +246,18 @@ namespace XDM.Core.Downloader.Adaptive
             {
                 this._http ??= HttpClientFactory.NewHttpClient(Config.Instance.Proxy);
                 this._http.Timeout = TimeSpan.FromSeconds(Config.Instance.NetworkTimeout);
-                //this._http.DefaultRequestVersion = HttpVersion.Version20;
-                //this._http.Timeout = TimeSpan.FromSeconds(Config.Instance.NetworkTimeout);
-                //SetHeaders(_http, _state.Headers);
-                //SetCookies(_http, _state.Cookies);
-                //if (_state.Authentication != null)
-                //{
-                //    SetAuthentication(_http, _state.Authentication);
-                //}
 
                 Directory.CreateDirectory(_state.TempDirectory);
 
                 Init(_state.TempDirectory);
+
+                if (FileSize > 0)
+                {
+                    var fs = new FileStream(TargetFile, FileMode.Create, FileAccess.Write, FileShare.None);
+                    fs.SetLength(FileSize);
+                    _fileHandle = fs.SafeFileHandle;
+                }
+
                 SaveState();
                 OnProbe();
                 DownloadChunks();
@@ -290,6 +293,10 @@ namespace XDM.Core.Downloader.Adaptive
                     OnFailed(new DownloadFailedEventArgs(
                         ex is DownloadException de ? de.ErrorCode : ErrorCode.Generic));
                 }
+            }
+            finally
+            {
+                _fileHandle?.Close();
             }
         }
 
@@ -369,7 +376,7 @@ namespace XDM.Core.Downloader.Adaptive
         {
             var chunkDownloader = new HttpChunkDownloader(chunk, _http, this._state.Headers,
                 this._state.Cookies, this._state.Authentication,
-                _chunkStreamMap, _cancelRequestor);
+                _chunkStreamMap, _cancelRequestor, _fileHandle);
 
             try
             {
@@ -439,36 +446,6 @@ namespace XDM.Core.Downloader.Adaptive
                 rwLock.ExitWriteLock();
             }
         }
-
-        //private int CreateFileList()
-        //{
-        //    var files = new Dictionary<bool, List<string>>();
-        //    var fileNames = new HashSet<string>();
-        //    foreach (var chunk in this._chunks)
-        //    {
-        //        var file = _chunkStreamMap.GetStream(chunk.Id);
-        //        if (fileNames.Contains(file)) continue;
-        //        var lines = files.GetValueOrDefault(chunk.First, new List<string>());
-        //        lines.Add("file '" + file + "'" + Environment.NewLine);
-        //        files[chunk.First] = lines;
-        //        fileNames.Add(file);
-        //    }
-        //    foreach (var chunk in this._chunks)
-        //    {
-        //        var file = _chunkStreamMap.GetStream(chunk.Id);
-        //        if (fileNames.Contains(file)) continue;
-        //        var lines = files.GetValueOrDefault(chunk.First, new List<string>());
-        //        lines.Add("file '" + _chunkStreamMap.GetStream(chunk.Id) + "'" + Environment.NewLine);
-        //        files[chunk.First] = lines;
-        //        fileNames.Add(file);
-        //    }
-        //    File.WriteAllLines(Path.Combine(Config.DataDir, Id, "chunks-0.txt"), files[true]);
-        //    if (files.Count > 1)
-        //    {
-        //        File.WriteAllLines(Path.Combine(Config.DataDir, Id, "chunks-1.txt"), files[false]);
-        //    }
-        //    return files.Count;
-        //}
 
         private void ConcatSegments(IEnumerable<string> files, string target)
         {
@@ -604,58 +581,7 @@ namespace XDM.Core.Downloader.Adaptive
         {
             this.TargetDir = folder;
         }
-
-        //private static void SetHeaders(System.Net.Http.HttpClient _http, Dictionary<string, List<string>> Headers)
-        //{
-        //    if (Headers != null)
-        //    {
-        //        foreach (var e in Headers)
-        //        {
-        //            try
-        //            {
-        //                _http.DefaultRequestHeaders.Add(e.Key, e.Value);
-        //            }
-        //            catch (Exception ex)
-        //            {
-        //                Log.Error(ex, "Setting headers failed in MultiSourceDownloaderBase");
-        //            }
-        //        }
-        //    }
-        //}
-
-        //private static void SetCookies(System.Net.Http.HttpClient _http, Dictionary<string, string> cookies)
-        //{
-        //    if (cookies != null)
-        //    {
-        //        try
-        //        {
-        //            _http.DefaultRequestHeaders.Add("Cookie",
-        //            string.Join(";", cookies.Select(kv => kv.Key + "=" + kv.Value).ToList()));
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            Log.Error(ex, "Setting cookies failed in MultiSourceDownloaderBase");
-        //        }
-        //    }
-        //}
-
-        //private void SetAuthentication(System.Net.Http.HttpClient _http, AuthenticationInfo? authentication)
-        //{
-        //    if (!authentication.HasValue)
-        //    {
-        //        return;
-        //    }
-        //    try
-        //    {
-        //        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
-        //            Convert.ToBase64String(Encoding.UTF8.GetBytes(authentication.Value.UserName + ":" + authentication.Value.Password)));
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.Error(ex, "Error setting auth header value");
-        //    }
-        //}
-
+        
         protected void OnComplete()
         {
             Log.Debug("OnComplete");
@@ -760,7 +686,7 @@ namespace XDM.Core.Downloader.Adaptive
             WriteChunkState(_chunks, w);
             ms.CopyTo(stream);
 #else
-            using var w = new BinaryWriter(stream, Encoding.UTF8, true);
+            using var w = a new BinaryWriter(stream, Encoding.UTF8, true);
             WriteChunkState(_chunks, w);
 #endif
         }

@@ -1,4 +1,4 @@
-﻿#if NET5_0_OR_GREATER
+#if NET5_0_OR_GREATER
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Security;
 using System.Text;
 using System.Threading;
 using TraceLog;
@@ -15,11 +16,33 @@ namespace XDM.Core.Clients.Http
 {
     internal class DotNetHttpClient : IHttpClient
     {
+        private static readonly SocketsHttpHandler _handler;
+        private static readonly HttpClient _httpClient;
         private bool disposed;
-        private HttpClient? hc;
         private CancellationTokenSource cts = new();
         private ProxyInfo? proxy;
 
+        static DotNetHttpClient()
+        {
+            _handler = new SocketsHttpHandler
+            {
+                AutomaticDecompression = DecompressionMethods.All,
+                PreAuthenticate = true,
+                UseDefaultCredentials = true,
+                MaxConnectionsPerServer = 100,
+                SslOptions = new SslClientAuthenticationOptions
+                {
+                    // Configure SSL options for HTTP/3
+                    // This is a basic configuration, adjust as needed
+                    ApplicationProtocols = new List<SslApplicationProtocol> { SslApplicationProtocol.Http3, SslApplicationProtocol.Http2, SslApplicationProtocol.Http11 },
+                    RemoteCertificateValidationCallback = (a, b, c, d) => true
+                },
+                EnableMultipleHttp2Connections = true,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(15)
+            };
+            _httpClient = new HttpClient(_handler);
+        }
+        
         public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(100);
 
         internal DotNetHttpClient(ProxyInfo? proxy)
@@ -40,39 +63,23 @@ namespace XDM.Core.Clients.Http
             var http = new HttpRequestMessage
             {
                 Method = method,
-                RequestUri = uri
+                RequestUri = uri,
+                Version = new Version(3, 0),
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
             };
 
-            lock (this)
+            var p = ProxyHelper.GetProxy(this.proxy);
+            if (p != null)
             {
-                if (this.hc == null)
-                {
-                    var handler = new HttpClientHandler
-                    {
-                        AutomaticDecompression = DecompressionMethods.All,
-                        PreAuthenticate = true,
-                        UseDefaultCredentials = true,
-                        MaxConnectionsPerServer = 100,
-                        ServerCertificateCustomValidationCallback = (a, b, c, d) => true
-                    };
-
-                    var p = ProxyHelper.GetProxy(this.proxy);
-                    if (p != null)
-                    {
-                        handler.Proxy = p;
-                    }
-
-                    if (authentication != null && !string.IsNullOrEmpty(authentication.Value.UserName))
-                    {
-                        handler.Credentials = new NetworkCredential(authentication.Value.UserName, authentication.Value.Password);
-                    }
-
-                    this.hc = new HttpClient(handler)
-                    {
-                        Timeout = this.Timeout
-                    };
-                }
+                _handler.Proxy = p;
             }
+
+            if (authentication != null && !string.IsNullOrEmpty(authentication.Value.UserName))
+            {
+                _handler.Credentials = new NetworkCredential(authentication.Value.UserName, authentication.Value.Password);
+            }
+
+            _httpClient.Timeout = this.Timeout;
 
             if (headers != null)
             {
@@ -137,7 +144,7 @@ namespace XDM.Core.Clients.Http
             r = session.Request;
             try
             {
-                response = this.hc!.Send(r, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                response = _httpClient.Send(r, HttpCompletionOption.ResponseHeadersRead, cts.Token);
                 response.EnsureSuccessStatusCode();
             }
             catch (HttpRequestException we)
@@ -157,7 +164,6 @@ namespace XDM.Core.Clients.Http
                 {
                     disposed = true;
                     cts.Cancel();
-                    this.hc?.Dispose();
                 }
                 catch { }
             }
