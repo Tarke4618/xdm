@@ -14,12 +14,12 @@ using TraceLog;
 using Translations;
 using XDM.Core.Downloader;
 using XDM.Core.Downloader.Progressive.DualHttp;
-using XDM.Core.Downloader.Progressive.SingleHttp;
 using XDM.Core.Downloader.Adaptive.Hls;
 using XDM.Core.Downloader.Adaptive.Dash;
 using XDM.Core.Downloader.Progressive;
 using XDM.Core.DataAccess;
 using XDM.Core.IO;
+using XDM.Core.Downloader.Progressive.SingleHttp;
 
 #if !NET5_0_OR_GREATER
 using XDM.Compatibility;
@@ -88,25 +88,23 @@ namespace XDM.Core
             switch (downloadInfo)
             {
                 case SingleSourceHTTPDownloadInfo info:
-                    http = new SingleSourceHTTPDownloader(info, authentication: authentication,
-                        proxy: proxyInfo, mediaProcessor: new FFmpegMediaProcessor(),
-                        convertToMp3: convertToMp3);
-                    RequestDataIO.SaveDownloadInfo(http.Id!, info);
+                    http = new HttpDownloader(info.Uri, Path.Combine(targetFolder, fileName));
+                    RequestDataIO.Save(http.Id!, info);
                     break;
                 case DualSourceHTTPDownloadInfo info:
                     http = new DualSourceHTTPDownloader(info, authentication: authentication,
                         proxy: proxyInfo, mediaProcessor: new FFmpegMediaProcessor());
-                    RequestDataIO.SaveDownloadInfo(http.Id!, info);
+                    RequestDataIO.Save(http.Id!, info);
                     break;
                 case MultiSourceHLSDownloadInfo info:
                     http = new MultiSourceHLSDownloader(info, authentication: authentication,
                         proxy: proxyInfo, mediaProcessor: new FFmpegMediaProcessor());
-                    RequestDataIO.SaveDownloadInfo(http.Id!, info);
+                    RequestDataIO.Save(http.Id!, info);
                     break;
                 case MultiSourceDASHDownloadInfo info:
                     http = new MultiSourceDASHDownloader(info, authentication: authentication,
                         proxy: proxyInfo, mediaProcessor: new FFmpegMediaProcessor());
-                    RequestDataIO.SaveDownloadInfo(http.Id!, info);
+                    RequestDataIO.Save(http.Id!, info);
                     break;
                 default:
                     Log.Debug("Unknow request info :: skipping download");
@@ -252,7 +250,7 @@ namespace XDM.Core
         {
             if (!awakePingTimer.Enabled)
             {
-                Log.Debug("Starting keep awake timer");
+                Log.Debug("Starting keep awaik timer");
                 awakePingTimer.Start();
             }
 
@@ -273,8 +271,7 @@ namespace XDM.Core
                 switch (item.Value.DownloadType)
                 {
                     case "Http":
-                        download = new SingleSourceHTTPDownloader((string)item.Key,
-                             mediaProcessor: new FFmpegMediaProcessor());
+                        download = new HttpDownloader(item.Key, Path.Combine(item.Value.TargetDir, item.Value.Name));
                         break;
                     case "Dash":
                         download = new DualSourceHTTPDownloader((string)item.Key,
@@ -656,28 +653,28 @@ namespace XDM.Core
             switch (entry.DownloadType)
             {
                 case "Http":
-                    var h1 = RequestDataIO.LoadSingleSourceHTTPDownloadInfo(entry.Id);// LoadInfo<SingleSourceHTTPDownloadInfo>(entry.Id);
+                    var h1 = RequestDataIO.Load<SingleSourceHTTPDownloadInfo>(entry.Id);
                     if (h1 != null)
                     {
                         return h1.Uri;
                     }
                     break;
                 case "Dash":
-                    var h2 = RequestDataIO.LoadDualSourceHTTPDownloadInfo(entry.Id);// LoadInfo<DualSourceHTTPDownloadInfo>(entry.Id);
+                    var h2 = RequestDataIO.Load<DualSourceHTTPDownloadInfo>(entry.Id);
                     if (h2 != null)
                     {
                         return h2.Uri1;
                     }
                     break;
                 case "Hls":
-                    var hls = RequestDataIO.LoadMultiSourceHLSDownloadInfo(entry.Id);// LoadInfo<MultiSourceHLSDownloadInfo>(entry.Id);
+                    var hls = RequestDataIO.Load<MultiSourceHLSDownloadInfo>(entry.Id);
                     if (hls != null)
                     {
                         return hls.VideoUri;
                     }
                     break;
                 case "Mpd-Dash":
-                    var dash = RequestDataIO.LoadMultiSourceDASHDownloadInfo(entry.Id); //LoadInfo<MultiSourceDASHDownloadInfo>(entry.Id);
+                    var dash = RequestDataIO.Load<MultiSourceDASHDownloadInfo>(entry.Id);
                     if (dash != null)
                     {
                         return dash.Url;
@@ -732,7 +729,7 @@ namespace XDM.Core
                 switch (entry.DownloadType)
                 {
                     case "Http":
-                        var h1 = DownloadStateIO.LoadSingleSourceHTTPDownloaderState(entry.Id);
+                        var h1 = DownloadStateIO.Load<HttpDownloaderState>(entry.Id);
                         if (h1 != null)
                         {
                             tempDir = h1.TempDir;
@@ -740,7 +737,7 @@ namespace XDM.Core
                         }
                         break;
                     case "Dash":
-                        var h2 = DownloadStateIO.LoadDualSourceHTTPDownloaderState(entry.Id);
+                        var h2 = DownloadStateIO.Load<DualSourceHTTPDownloaderState>(entry.Id);
                         if (h2 != null)
                         {
                             tempDir = h2.TempDir;
@@ -748,7 +745,7 @@ namespace XDM.Core
                         }
                         break;
                     case "Hls":
-                        var hls = DownloadStateIO.LoadMultiSourceHLSDownloadState(entry.Id);
+                        var hls = DownloadStateIO.Load<MultiSourceHLSDownloadState>(entry.Id);
                         if (hls != null)
                         {
                             tempDir = hls.TempDirectory;
@@ -756,7 +753,7 @@ namespace XDM.Core
                         }
                         break;
                     case "Mpd-Dash":
-                        var dash = DownloadStateIO.LoadMultiSourceDASHDownloadState(entry.Id);
+                        var dash = DownloadStateIO.Load<MultiSourceDASHDownloadState>(entry.Id);
                         if (dash != null)
                         {
                             tempDir = dash.TempDirectory;
@@ -807,18 +804,18 @@ namespace XDM.Core
                 switch (entry.DownloadType)
                 {
                     case "Http":
-                        var info = RequestDataIO.LoadSingleSourceHTTPDownloadInfo(entry.Id);
+                        var info = RequestDataIO.Load<SingleSourceHTTPDownloadInfo>(entry.Id);
                         request = info;
                         convertToMp3 = info?.ConvertToMp3 ?? false;
                         break;
                     case "Dash":
-                        request = RequestDataIO.LoadDualSourceHTTPDownloadInfo(entry.Id);
+                        request = RequestDataIO.Load<DualSourceHTTPDownloadInfo>(entry.Id);
                         break;
                     case "Hls":
-                        request = RequestDataIO.LoadMultiSourceHLSDownloadInfo(entry.Id);
+                        request = RequestDataIO.Load<MultiSourceHLSDownloadInfo>(entry.Id);
                         break;
                     case "Mpd-Dash":
-                        request = RequestDataIO.LoadMultiSourceDASHDownloadInfo(entry.Id);
+                        request = RequestDataIO.Load<MultiSourceDASHDownloadInfo>(entry.Id);
                         break;
                     default:
                         request = null;

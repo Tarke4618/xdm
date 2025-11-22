@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -319,7 +319,7 @@ namespace XDM.Core.Downloader.Progressive
                     var newchunkId = SplitPiece(maxChunkId);
                     if (newchunkId != null && !this.cancelFlag.IsCancellationRequested)
                     {
-                        this.grabberDict[newchunkId] = new PieceGrabber(newchunkId, this);
+                        this.grabberDict[newchunkId] = new PieceGrabber(newchunkId, this, null);
                         grabberDict[newchunkId].Download();
                     }
                 }
@@ -358,7 +358,7 @@ namespace XDM.Core.Downloader.Progressive
                 {
                     var chunkId = GetInactivePiece();
                     if (chunkId == null || this.cancelFlag.IsCancellationRequested) break;
-                    grabberDict[chunkId] = new PieceGrabber(chunkId, this);
+                    grabberDict[chunkId] = new PieceGrabber(chunkId, this, null);
                     grabberDict[chunkId].Download();
                     count++;
                 }

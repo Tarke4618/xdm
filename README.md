@@ -30,6 +30,7 @@ XDM seamlessly integrates with Google Chrome, Mozilla Firefox Quantum, Opera, Vi
 ## Features
 - Download files at maximum possible speed (5-6 times faster than conventional downloaders).
 - XDM can save video from numerous video streaming sites.
+- **Advanced video sniffing to download from more websites.** XDM now features a powerful video sniffer that detects and lists videos playing in the browser, allowing you to download them with a single click. This feature works on a wide variety of websites where traditional video downloaders might fail.
 - Works with all modern browsers on Windows, Linux and Mac OS X. XDM supports [Google Chrome][18], [Chromium][18], [Firefox Quantum][19], [Vivaldi][20], [Edge][21] and many other popular browsers.
 - XDM has built in video converter, which lets you convert downloaded video to MP3 and MP4 formats.
 - Supports `HTTP`, `HTTPS`, `FTP` as well as video streaming protocols like `MPEG-DASH`, `Apple HLS`, and `Adobe HDS`.

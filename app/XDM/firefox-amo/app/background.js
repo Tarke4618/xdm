@@ -32,7 +32,7 @@ chrome.webRequest.onHeadersReceived.addListener(
                     videos.push(videoInfo);
                     videoMap.set(tabId, videos);
 
-                    chrome.action.setBadgeText({ text: videos.length.toString(), tabId: tabId });
+                    chrome.browserAction.setBadgeText({ text: videos.length.toString(), tabId: tabId });
                 }
             }
         }

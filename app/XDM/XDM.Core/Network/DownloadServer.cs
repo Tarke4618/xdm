@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Threading.Tasks;
 
-namespace XDM.Core.IPC
+namespace XDM.Core.Network
 {
     public class DownloadServer
     {

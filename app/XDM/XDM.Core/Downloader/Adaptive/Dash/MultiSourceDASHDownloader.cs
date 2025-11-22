@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -156,7 +156,7 @@ namespace XDM.Core.Downloader.Adaptive.Dash
 
         protected override void RestoreState()
         {
-            var state = DownloadStateIO.LoadMultiSourceDASHDownloadState(Id!);
+            var state = DownloadStateIO.Load<MultiSourceDASHDownloadState>(Id!);
             this._state = state;
 
             //var bytes = TransactedIO.ReadBytes(Id + ".state", Config.DataDir);

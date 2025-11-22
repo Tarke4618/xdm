@@ -1,4 +1,4 @@
-﻿using XDM.Core.MediaParser.Hls;
+using XDM.Core.MediaParser.Hls;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -308,7 +308,7 @@ namespace XDM.Core.Downloader.Adaptive.Hls
 
         protected override void RestoreState()
         {
-            var state = DownloadStateIO.LoadMultiSourceHLSDownloadState(Id!);
+            var state = DownloadStateIO.Load<MultiSourceHLSDownloadState>(Id!);
             this._state = state;
 
             try

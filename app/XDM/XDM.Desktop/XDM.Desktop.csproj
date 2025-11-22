@@ -24,6 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\XDM.Core.Ref\XDM.Core.Ref.csproj" />
+    <ProjectReference Include="..\XDM.Core\XDM.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +7,6 @@ using System.Threading;
 using TraceLog;
 using XDM.Core;
 using XDM.Core.Downloader;
-using XDM.Core.Downloader.Progressive.SingleHttp;
 using XDM.Core.Updater;
 using XDM.Core.Util;
 
@@ -19,7 +18,7 @@ namespace XDM.Core.UI
         private IUpdaterUI updaterUI;
         private IList<UpdateInfo>? updates;
         private int count = 0;
-        private SingleSourceHTTPDownloader? http;
+        private HttpDownloader? http;
         private readonly IList<string> files = new List<string>();
         private long size;
         private long downloaded;
@@ -83,16 +82,7 @@ namespace XDM.Core.UI
             {
                 Log.Debug("Downloading " + update.Name);
                 updaterUI.Label = "Downloading " + update.Name;
-                http = new SingleSourceHTTPDownloader(new SingleSourceHTTPDownloadInfo
-                {
-                    Uri = update.Url,
-                    Headers = new Dictionary<string, List<string>>
-                    {
-                        ["User-Agent"] = new List<string>{
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36" }
-                    }
-                });
-                http.SetTargetDirectory(Path.GetTempPath());
+                http = new HttpDownloader(update.Url, Path.GetTempPath());
                 http.Started += updaterUI.DownloadStarted;
                 //http.Probed += HandleProbeResult;
                 http.Finished += Finished;
@@ -108,11 +98,11 @@ namespace XDM.Core.UI
             }
         }
 
-        private void ProgressChanged(object? sender, ProgressResultEventArgs e)
+        private void ProgressChanged(long downloaded, long total)
         {
             try
             {
-                var totalProgress = (int)(((downloaded + e.Downloaded) * 100) / size);
+                var totalProgress = (int)(((this.downloaded + downloaded) * 100) / size);
                 this.updaterUI.DownloadProgressChanged(this, new ProgressResultEventArgs { Progress = totalProgress });
             }
             catch (Exception ex)
@@ -143,9 +133,10 @@ namespace XDM.Core.UI
                         var name = Path.GetFileName(file);
                         var bakup = Path.Combine(Config.AppDir, name + ".bak");
                         var target = Path.Combine(Config.AppDir, name);
-                        File.Move(file, bakup);
-                        File.Delete(target);
-                        File.Move(bakup, target);
+                        if(File.Exists(target)){
+                            File.Move(target, bakup, true);
+                        }
+                        File.Move(file, target, true);
                     }
 
                     File.WriteAllText(Path.Combine(Config.AppDir, "ytdlp-update.json"),
@@ -167,4 +158,3 @@ namespace XDM.Core.UI
         }
     }
 }
-

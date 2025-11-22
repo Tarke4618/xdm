@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,12 +25,12 @@ namespace XDM.Core.UI
                 string? referer = null;
                 if (item.DownloadType == "Http")
                 {
-                    var state = DownloadStateIO.LoadSingleSourceHTTPDownloaderState(item.Id);
+                    var state = DownloadStateIO.Load<HttpDownloaderState>(item.Id);
                     referer = GetReferer(state.Headers);
                 }
                 else if (item.DownloadType == "Dash")
                 {
-                    var state = DownloadStateIO.LoadDualSourceHTTPDownloaderState(item.Id);
+                    var state = DownloadStateIO.Load<DualSourceHTTPDownloaderState>(item.Id);
                     referer = GetReferer(state.Headers1);
                 }
                 else
@@ -50,7 +50,7 @@ namespace XDM.Core.UI
                 }
                 if (item.DownloadType == "Http")
                 {
-                    var downloader = new SingleSourceHTTPDownloader(item.Id);
+                    var downloader = new HttpDownloader(item.PrimaryUrl, Path.Combine(item.TargetDir, item.Name));
                     downloader.RestoreState();
                     ApplicationContext.LinkRefresher.RefreshedLinkReceived += (_, _) => dialog.LinkReceived();
                     ApplicationContext.LinkRefresher.AddToWatchList(downloader);

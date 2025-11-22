@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using XDM.Core.Downloader;
 using XDM.Core.Downloader.Progressive;
 using XDM.Core.Downloader.Progressive.DualHttp;
 using XDM.Core.Downloader.Progressive.SingleHttp;
@@ -45,7 +46,7 @@ namespace XDM.Core
 
         private bool IsMatchingSingleSourceLink(Message message)
         {
-            if (!(refreshLinkCandidate is SingleSourceHTTPDownloader)) return false;
+            if (!(refreshLinkCandidate is HttpDownloader)) return false;
             var contentLength = 0L;
             var header = message.ResponseHeaders.Keys.Where(key => key.Equals("content-length", StringComparison.InvariantCultureIgnoreCase));
             if (header.Count() == 1)
@@ -57,7 +58,7 @@ namespace XDM.Core
 
         private bool IsMatchingSingleSourceLink(SingleSourceHTTPDownloadInfo info)
         {
-            if (!(refreshLinkCandidate is SingleSourceHTTPDownloader)) return false;
+            if (!(refreshLinkCandidate is HttpDownloader)) return false;
             var contentLength = info.ContentLength;
             return refreshLinkCandidate.FileSize == contentLength && refreshLinkCandidate.FileSize > 0;
         }
@@ -71,7 +72,7 @@ namespace XDM.Core
                 Headers = message?.RequestHeaders,
                 Cookies = message?.Cookies
             };
-            ((SingleSourceHTTPDownloader)refreshLinkCandidate).SetDownloadInfo(info);
+            ((HttpDownloader)refreshLinkCandidate).SetDownloadInfo(info);
             refreshLinkCandidate = null;
             RefreshedLinkReceived?.Invoke(this, EventArgs.Empty);
             ClearRefreshRecivedEvents();
@@ -80,7 +81,7 @@ namespace XDM.Core
         private void HandleSingleSourceLinkRefresh(SingleSourceHTTPDownloadInfo info)
         {
             if (refreshLinkCandidate == null) return;
-            ((SingleSourceHTTPDownloader)refreshLinkCandidate).SetDownloadInfo(info);
+            ((HttpDownloader)refreshLinkCandidate).SetDownloadInfo(info);
             refreshLinkCandidate = null;
             RefreshedLinkReceived?.Invoke(this, EventArgs.Empty);
             ClearRefreshRecivedEvents();

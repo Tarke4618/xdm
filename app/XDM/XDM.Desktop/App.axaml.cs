@@ -4,13 +4,15 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
-using XDM.Core.Network;
+using XDM.Core;
+using XDM.Core.BrowserMonitoring;
+using XDM.Core.UI;
 using XDM.Desktop.ViewModels;
 using XDM.Desktop.Views;
 
 namespace XDM.Desktop;
 
-public partial class App : Application
+public partial class App : global::Avalonia.Application
 {
     public override void Initialize()
     {
@@ -19,7 +21,18 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        DownloadServer.Start();
+        var desktopApplication = new DesktopApplication();
+        var mainViewModel = new MainWindowViewModel(desktopApplication);
+
+        ApplicationContext.Configurer()
+            .RegisterApplication(desktopApplication)
+            .RegisterApplicationCore(new ApplicationCore())
+            .RegisterClipboardMonitor(new XDM.Core.ClipboardMonitor())
+            .RegisterLinkRefresher(new LinkRefresher())
+            .RegisterPlatformUIService(new PlatformUIService())
+            .RegisterCapturedVideoTracker(new VideoTracker())
+            .RegisterApplicationWindow(new ApplicationWindow())
+            .Configure();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -28,7 +41,7 @@ public partial class App : Application
             DisableAvaloniaDataAnnotationValidation();
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = mainViewModel,
             };
         }
 

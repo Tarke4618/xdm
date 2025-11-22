@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +8,10 @@ using Translations;
 using XDM.Core;
 using XDM.Core.DataAccess;
 using XDM.Core.Downloader;
+using XDM.Core.Downloader.Adaptive.Dash;
+using XDM.Core.Downloader.Adaptive.Hls;
+using XDM.Core.Downloader.Progressive.DualHttp;
+using XDM.Core.Downloader.Progressive.SingleHttp;
 using XDM.Core.IO;
 using XDM.Core.UI;
 using XDM.Core.Util;
@@ -238,28 +242,28 @@ namespace XDM.Core
                 {
                     case "Http":
                         {
-                            var info = RequestDataIO.LoadSingleSourceHTTPDownloadInfo(ent.Id);
+                            var info = RequestDataIO.Load<SingleSourceHTTPDownloadInfo>(ent.Id);
                             cookies = info?.Cookies ?? emptyCookie;
                             headers = info?.Headers ?? emptyHeaders;
                             break;
                         }
                     case "Dash":
                         {
-                            var info = RequestDataIO.LoadDualSourceHTTPDownloadInfo(ent.Id);
+                            var info = RequestDataIO.Load<DualSourceHTTPDownloadInfo>(ent.Id);
                             cookies = info?.Cookies1 ?? emptyCookie;
                             headers = info?.Headers1 ?? emptyHeaders;
                             break;
                         }
                     case "Hls":
                         {
-                            var info = RequestDataIO.LoadMultiSourceHLSDownloadInfo(ent.Id);
+                            var info = RequestDataIO.Load<MultiSourceHLSDownloadInfo>(ent.Id);
                             cookies = info?.Cookies ?? emptyCookie;
                             headers = info?.Headers ?? emptyHeaders;
                             break;
                         }
                     case "Mpd-Dash":
                         {
-                            var info = RequestDataIO.LoadMultiSourceDASHDownloadInfo(ent.Id);
+                            var info = RequestDataIO.Load<MultiSourceDASHDownloadInfo>(ent.Id);
                             cookies = info?.Cookies ?? emptyCookie;
                             headers = info?.Headers ?? emptyHeaders;
                             break;

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using XDM.Core.Network;
 
 namespace XDM.Desktop.ViewModels
 {
@@ -12,12 +11,12 @@ namespace XDM.Desktop.ViewModels
     {
         public ObservableCollection<DownloadItem> Downloads { get; } = new ObservableCollection<DownloadItem>();
 
-        public MainWindowViewModel()
+        public MainWindowViewModel(DesktopApplication desktopApplication)
         {
-            DownloadServer.OnLinkReceived += OnLinkReceived;
+            desktopApplication.DownloadLinkReceived += OnLinkReceived;
         }
 
-        private void OnLinkReceived(string url)
+        private void OnLinkReceived(object? sender, string url)
         {
             Dispatcher.UIThread.Post(() => AddDownload(url));
         }

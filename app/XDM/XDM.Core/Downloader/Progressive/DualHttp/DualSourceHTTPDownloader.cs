@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -93,7 +93,7 @@ namespace XDM.Core.Downloader.Progressive.DualHttp
                 StreamType = StreamType.Primary
             };
             pieces[chunk1.Id] = chunk1;
-            grabberDict[chunk1.Id] = new PieceGrabber(chunk1.Id, this);
+            grabberDict[chunk1.Id] = new PieceGrabber(chunk1.Id, this, null);
 
             var chunk2 = new Piece
             {
@@ -330,7 +330,7 @@ namespace XDM.Core.Downloader.Progressive.DualHttp
 
         public override void RestoreState()
         {
-            state = DownloadStateIO.LoadDualSourceHTTPDownloaderState(Id!);
+            state = DownloadStateIO.Load<DualSourceHTTPDownloaderState>(Id!);
             try
             {
                 if (!TransactedIO.ReadStream("chunks.db", state!.TempDir!, s =>
