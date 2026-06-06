@@ -64,7 +64,7 @@ jobs:
       - name: Package Windows Zip Release
         if: matrix.os == 'windows-latest'
         run: |
-          mkdir dist
+          New-Item -ItemType Directory -Force -Path dist
           Compress-Archive -Path publish/win-x64/* -DestinationPath dist/xdm-windows-x64.zip
 
       # ==========================================
@@ -80,6 +80,7 @@ jobs:
       - name: Package Debian Package (.deb)
         if: matrix.os == 'ubuntu-latest'
         run: |
+          mkdir -p dist
           mkdir -p publish/deb/DEBIAN
           mkdir -p publish/deb/usr/bin
           mkdir -p publish/deb/usr/share/xdm
@@ -138,7 +139,7 @@ jobs:
       - name: Package macOS DMG
         if: matrix.os == 'macos-latest'
         run: |
-          mkdir dist
+          mkdir -p dist
           hdiutil create -volname "XDM Rebirth" -srcfolder publish/osx-universal/app -ov -format UDZO dist/xdm-macos-universal.dmg
 
       # ==========================================
