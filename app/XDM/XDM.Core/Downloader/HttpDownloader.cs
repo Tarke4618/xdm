@@ -90,7 +90,7 @@ namespace XDM.Core.Downloader
 
         public override void Resume()
         {
-            new Thread(() =>
+            Task.Run(() =>
             {
                 try
                 {
@@ -127,7 +127,7 @@ namespace XDM.Core.Downloader
                     Log.Debug(e, e.Message);
                     base.OnFailed(e is DownloadException de ? de.ErrorCode : ErrorCode.Generic);
                 }
-            }).Start();
+            });
         }
 
         protected override void SaveChunkState()

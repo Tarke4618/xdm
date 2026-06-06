@@ -153,7 +153,22 @@ namespace XDM.Tests
 
         private void Test()
         {
-            var reader = new JsonTextReader(new StreamReader(@"C:\Users\subhro\Desktop\message.json"));
+            string sampleJson = @"{
+                ""messageType"": ""download"",
+                ""message"": {
+                    ""url"": ""https://example.com/file.zip"",
+                    ""cookies"": {
+                        ""session"": ""12345""
+                    },
+                    ""requestHeaders"": {
+                        ""User-Agent"": [""Mozilla/5.0""]
+                    },
+                    ""responseHeaders"": {
+                        ""Content-Length"": [""1024""]
+                    }
+                }
+            }";
+            var reader = new JsonTextReader(new StringReader(sampleJson));
             if (reader.Read() && reader.TokenType == JsonToken.StartObject)
             {
                 while (reader.Read())

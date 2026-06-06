@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Net;
 using System.Linq;
@@ -30,7 +30,7 @@ namespace XDM.Core.BrowserMonitoring
 
         public void Run()
         {
-            new Thread(() =>
+            Task.Run(() =>
             {
                 try
                 {
@@ -41,7 +41,7 @@ namespace XDM.Core.BrowserMonitoring
                     Log.Debug(ex.ToString());
                     ApplicationContext.Application.ShowMessageBox(null, TextResource.GetText("MSG_ALREADY_RUNNING"));
                 }
-            }).Start();
+            });
         }
 
         public void HandleRequest(RequestContext context)

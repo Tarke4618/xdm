@@ -17,10 +17,13 @@ namespace XDM.Desktop.ViewModels
         private double _progress;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsDownloading))]
         private string _status;
 
         [ObservableProperty]
         private string _speed;
+
+        public bool IsDownloading => Status == "Downloading";
 
         private readonly IDownloader _downloader;
         private long _lastBytes;

@@ -13,7 +13,7 @@ namespace XDM.Core.Downloader.Progressive
 {
     public class PieceGrabber : IDisposable
     {
-        private Thread t;
+        private Task? t;
         private ManualResetEvent sleepHandle = new ManualResetEvent(false);
         private Uri? redirectUri;
         private string? pieceId;
@@ -60,8 +60,7 @@ namespace XDM.Core.Downloader.Progressive
 
         public void Download()
         {
-            this.t = new Thread(Download2);
-            this.t.Start();
+            this.t = Task.Run(Download2);
         }
 
         private void Download2()

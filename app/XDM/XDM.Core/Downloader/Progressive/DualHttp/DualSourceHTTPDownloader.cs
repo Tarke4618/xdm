@@ -125,7 +125,7 @@ namespace XDM.Core.Downloader.Progressive.DualHttp
 
         public override void Resume()
         {
-            new Thread(() =>
+            Task.Run(() =>
              {
                  try
                  {
@@ -163,7 +163,7 @@ namespace XDM.Core.Downloader.Progressive.DualHttp
                      Log.Debug(e, e.Message);
                      base.OnFailed(e is DownloadException ex ? ex.ErrorCode : ErrorCode.Generic);
                  }
-             }).Start();
+             });
         }
 
         public override void PieceConnected(string pieceId, ProbeResult? result)

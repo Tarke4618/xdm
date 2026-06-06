@@ -112,57 +112,44 @@ namespace XDM.Core.Downloader.Adaptive.Hls
                 var success = true;
                 if (state.Demuxed)
                 {
-                    initLatch = new CountdownLatch(2);
-                    var t1 = new Thread(() =>
-                      {
-                          var res = GetHlsManifest(state.NonMuxedVideoPlaylistUrl,
-                              out HttpStatusCode statusCode,
-                              out string? text);
-                          results[0] = text;
-                          status[0] = statusCode;
-                          if (!res)
-                          {
-                              success = false;
-                          }
-                          initLatch.CountDown();
-                      });
-                    t1.Start();
+                    var task1 = Task.Run(() =>
+                    {
+                        var res = GetHlsManifest(state.NonMuxedVideoPlaylistUrl,
+                            out HttpStatusCode statusCode,
+                            out string? text);
+                        results[0] = text;
+                        status[0] = statusCode;
+                        return res;
+                    });
 
-                    var t2 = new Thread(() =>
-                      {
-                          var res = GetHlsManifest(state.NonMuxedAudioPlaylistUrl,
-                              out HttpStatusCode statusCode,
-                              out string? text);
-                          results[1] = text;
-                          status[1] = statusCode;
-                          if (!res)
-                          {
-                              success = false;
-                          }
-                          initLatch.CountDown();
-                      });
-                    t2.Start();
+                    var task2 = Task.Run(() =>
+                    {
+                        var res = GetHlsManifest(state.NonMuxedAudioPlaylistUrl,
+                            out HttpStatusCode statusCode,
+                            out string? text);
+                        results[1] = text;
+                        status[1] = statusCode;
+                        return res;
+                    });
+
+                    Task.WaitAll(task1, task2);
+                    success = task1.Result && task2.Result;
                 }
                 else
                 {
-                    initLatch = new CountdownLatch(1);
-
-                    new Thread(() =>
+                    var task = Task.Run(() =>
                     {
                         var res = GetHlsManifest(state.MuxedPlaylistUrl,
                             out HttpStatusCode statusCode,
                             out string? text);
                         results[0] = text;
                         status[0] = statusCode;
-                        if (!res)
-                        {
-                            success = false;
-                        }
-                        initLatch.CountDown();
-                    }).Start();
-                }
+                        return res;
+                    });
 
-                initLatch.Wait();
+                    task.Wait();
+                    success = task.Result;
+                }
                 this._cancellationTokenSource.ThrowIfCancellationRequested();
                 //var results = await Task.WhenAll(tasks);
                 HttpStatusCode? FindErrorStatus()

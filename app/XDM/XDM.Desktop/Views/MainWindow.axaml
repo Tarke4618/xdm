@@ -3,35 +3,182 @@
         xmlns:vm="using:XDM.Desktop.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="550"
         x:Class="XDM.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="XDM.Desktop">
+        Title="Xtreme Download Manager - Antigravity 2.0"
+        TransparencyLevelHint="Mica"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="250, *">
-        <!-- Sidebar -->
-        <StackPanel Grid.Column="0" Background="#2D2D30">
-            <Button Content="All Downloads" Margin="10" />
-            <Button Content="Video" Margin="10" />
-            <Button Content="Settings" Margin="10" />
-        </StackPanel>
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#252528"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#353538"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button:hover">
+            <Setter Property="Background" Value="#353538"/>
+            <Setter Property="BorderBrush" Value="#505055"/>
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.96)"/>
+        </Style>
+        
+        <!-- Sidebar Button Styles -->
+        <Style Selector="ListBoxItem.SidebarItem">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Margin" Value="4,2"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#A0A0A5"/>
+        </Style>
+        <Style Selector="ListBoxItem.SidebarItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#25252A"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="ListBoxItem.SidebarItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1A73E8"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+    </Window.Styles>
 
-        <!-- Content -->
-        <ListBox Grid.Column="1" ItemsSource="{Binding Downloads}">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Margin="10">
-                        <TextBlock Text="{Binding Filename}" FontWeight="Bold" />
-                        <ProgressBar Value="{Binding Progress}" />
-                        <TextBlock Text="{Binding Status}" />
-                    </StackPanel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-    </Grid>
+    <Panel>
+        <!-- Background Overlay for acrylic/mica vibrancy support -->
+        <ExperimentalAcrylicBorder IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="#0F0F12"
+                    TintOpacity="0.85"
+                    MaterialOpacity="0.65" />
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <!-- Main Window Container -->
+        <Grid RowDefinitions="Auto, *">
+            <!-- Custom Title Bar Spacing -->
+            <Border Grid.Row="0" Height="38" Background="Transparent" IsHitTestVisible="False"/>
+
+            <!-- App Workspace Grid -->
+            <Grid Grid.Row="1" ColumnDefinitions="240, *">
+                <!-- Sidebar Panel -->
+                <Border Grid.Column="0" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0" Padding="12,8">
+                    <Grid RowDefinitions="Auto, *, Auto">
+                        <!-- App Brand Header -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,20" Spacing="10">
+                            <Image Source="/Assets/avalonia-logo.ico" Width="28" Height="28" />
+                            <TextBlock Text="XDM REBIRTH" VerticalAlignment="Center" FontWeight="Bold" FontSize="16" Foreground="#1A73E8" LetterSpacing="1" />
+                        </StackPanel>
+
+                        <!-- Navigation Categories -->
+                        <ListBox Grid.Row="1" Background="Transparent" BorderThickness="0" SelectedIndex="0">
+                            <ListBoxItem Classes="SidebarItem">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="M19 13H5v-2h14v2z" Width="16" Height="16"/>
+                                    <TextBlock Text="All Downloads" FontWeight="Medium"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Classes="SidebarItem">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" Width="16" Height="16"/>
+                                    <TextBlock Text="In Progress" FontWeight="Medium"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Classes="SidebarItem">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" Width="16" Height="16"/>
+                                    <TextBlock Text="Completed" FontWeight="Medium"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Classes="SidebarItem">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z" Width="16" Height="16"/>
+                                    <TextBlock Text="Video Sniffer" FontWeight="Medium"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem Classes="SidebarItem">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <PathIcon Data="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" Width="16" Height="16"/>
+                                    <TextBlock Text="Settings" FontWeight="Medium"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+
+                        <!-- Exclusions and Floating drop zone toggle -->
+                        <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,10">
+                            <TextBlock Text="Quick Actions" FontSize="11" FontWeight="Bold" Foreground="#606065" Margin="8,0"/>
+                            <ToggleButton Content="Exclusions" HorizontalAlignment="Stretch" Padding="12,6" />
+                            <ToggleButton Content="Drop Zone Active" HorizontalAlignment="Stretch" Padding="12,6" IsChecked="True" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Content Area -->
+                <Grid Grid.Column="1" RowDefinitions="Auto, *">
+                    <!-- Toolbar Header -->
+                    <Border Grid.Row="0" Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="0,0,0,1" Padding="16,12">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <!-- Left Toolbar actions -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                                <Button Content="+ Add URL" Background="#1A73E8"/>
+                                <Button Content="Pause All"/>
+                                <Button Content="Resume All"/>
+                                <Button Content="Clean Completed"/>
+                            </StackPanel>
+                            <!-- Search Bar -->
+                            <TextBox Grid.Column="1" Width="200" Watermark="Search downloads..." Margin="0" CornerRadius="6" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Downloads List -->
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Downloads}" Background="Transparent" Padding="12">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DownloadItem">
+                                <Border Background="#1C1C1F" BorderBrush="#2C2C2F" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,4">
+                                    <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto, Auto">
+                                        <!-- Filename -->
+                                        <TextBlock Grid.Column="0" Grid.Row="0" Text="{Binding Filename}" FontWeight="Bold" FontSize="14" Foreground="#F0F0F0" TextTrimming="CharacterEllipsis"/>
+                                        
+                                        <!-- Actions -->
+                                        <StackPanel Grid.Column="1" Grid.Row="0" Grid.RowSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Content="Resume" FontSize="12" Padding="8,4" IsVisible="{Binding !IsDownloading}"/>
+                                            <Button Content="Pause" FontSize="12" Padding="8,4" IsVisible="{Binding IsDownloading}"/>
+                                            <Button Content="Folder" FontSize="12" Padding="8,4" />
+                                            <Button Content="Delete" FontSize="12" Padding="8,4" Foreground="#FF4D4D" BorderBrush="#501A1A"/>
+                                        </StackPanel>
+
+                                        <!-- Progress Bar -->
+                                        <ProgressBar Grid.Row="1" Grid.Column="0" Value="{Binding Progress}" Height="4" Margin="0,10" Background="#3A3A3D" Foreground="#1A73E8" CornerRadius="2"/>
+
+                                        <!-- Stats and Speeds -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="20">
+                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#9A9A9F" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Speed}" FontSize="11" Foreground="#9A9A9F" />
+                                            <TextBlock Text="ETA: calculating..." FontSize="11" Foreground="#9A9A9F" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Panel>
 </Window>

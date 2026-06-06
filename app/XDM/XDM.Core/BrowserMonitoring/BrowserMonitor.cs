@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using TraceLog;
 using XDM.Core;
 
@@ -6,8 +6,8 @@ namespace XDM.Core.BrowserMonitoring
 {
     public static class BrowserMonitor
     {
-        //private static IpcServer ipcServer;
         private static IpcHttpMessageProcessor messageProcessor;
+        private static XDM.Core.Network.DownloadServer pipeServer;
 
         public static void Run()
         {
@@ -19,6 +19,15 @@ namespace XDM.Core.BrowserMonitoring
             catch (Exception ex)
             {
                 Log.Debug(ex, ex.Message);
+            }
+            try
+            {
+                pipeServer = new XDM.Core.Network.DownloadServer();
+                _ = pipeServer.StartListeningAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, $"Failed to start Named Pipe server: {ex.Message}");
             }
             //ipcServer = new IpcServer(8597);
             //try

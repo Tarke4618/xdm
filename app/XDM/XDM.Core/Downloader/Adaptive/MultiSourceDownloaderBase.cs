@@ -123,7 +123,7 @@ namespace XDM.Core.Downloader.Adaptive
 
         private void Start(bool start)
         {
-            new Thread(() =>
+            Task.Run(() =>
             {
                 Directory.CreateDirectory(_state.TempDirectory);
                 ticksAtDownloadStartOrResume = Helpers.TickCount();
@@ -133,7 +133,7 @@ namespace XDM.Core.Downloader.Adaptive
                     Started?.Invoke(this, EventArgs.Empty);
                     Download();
                 }
-            }).Start();
+            });
         }
 
         public void SaveForLater()
@@ -167,7 +167,7 @@ namespace XDM.Core.Downloader.Adaptive
 
         public virtual void Resume()
         {
-            new Thread(() =>
+            Task.Run(() =>
             {
                 try
                 {
@@ -217,7 +217,7 @@ namespace XDM.Core.Downloader.Adaptive
                             ex is DownloadException de ? de.ErrorCode : ErrorCode.Generic));
                     }
                 }
-            }).Start();
+            });
         }
 
         protected virtual void SaveChunkState()
@@ -310,14 +310,14 @@ namespace XDM.Core.Downloader.Adaptive
 
             for (int i = 0; i < threadCount; i++)
             {
-                new Thread(() =>
+                Task.Run(() =>
                 {
                     while (_workStealingQueue.TryDequeue(out var chunk) || _workStealingQueue.TrySteal(out chunk))
                     {
                         if (this._cancellationTokenSource.IsCancellationRequested) break;
                         DownloadChunk(chunk, countdownLatch);
                     }
-                }).Start();
+                });
             }
 
             Log.Debug("Waiting for downloading all chunks");

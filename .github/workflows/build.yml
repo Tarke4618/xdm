@@ -1,0 +1,151 @@
+name: XDM Rebirth Cross-Platform CI/CD
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build-extension:
+    name: Package Browser Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Zip Chrome Extension
+        run: |
+          mkdir -p dist
+          cd app/XDM/chrome-extension
+          zip -r ../../../dist/xdm-browser-monitor-chrome.zip .
+          cd ../../../
+
+      - name: Package Firefox Add-on
+        run: |
+          cd app/XDM/chrome-extension
+          # In Firefox MV3, service worker background script is defined differently or is packaged directly.
+          # Zip as is for xpi packaging.
+          zip -r ../../../dist/xdm-browser-monitor-firefox.xpi .
+          cd ../../../
+
+      - name: Upload Extension Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-extensions
+          path: dist/
+
+  build-desktop:
+    name: Build & Package Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: build-extension
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # ==========================================
+      # WINDOWS BUILD PIPELINE
+      # ==========================================
+      - name: Restore & Publish Windows Build
+        if: matrix.os == 'windows-latest'
+        run: |
+          dotnet restore app/XDM/XDM.sln
+          dotnet publish app/XDM/XDM.Desktop/XDM.Desktop.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64/app
+          dotnet publish app/XDM/XDM.MessagingHost/XDM.MessagingHost.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64/host
+
+      - name: Package Windows Zip Release
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir dist
+          Compress-Archive -Path publish/win-x64/* -DestinationPath dist/xdm-windows-x64.zip
+
+      # ==========================================
+      # LINUX BUILD PIPELINE
+      # ==========================================
+      - name: Restore & Publish Linux Build
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet restore app/XDM/XDM.sln
+          dotnet publish app/XDM/XDM.Desktop/XDM.Desktop.csproj -c Release -r linux-x64 --self-contained true -o publish/linux-x64/app
+          dotnet publish app/XDM/XDM.MessagingHost/XDM.MessagingHost.csproj -c Release -r linux-x64 --self-contained true -o publish/linux-x64/host
+
+      - name: Package Debian Package (.deb)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p publish/deb/DEBIAN
+          mkdir -p publish/deb/usr/bin
+          mkdir -p publish/deb/usr/share/xdm
+          
+          # Copy published files to staging
+          cp -r publish/linux-x64/app/* publish/deb/usr/share/xdm/
+          cp -r publish/linux-x64/host/* publish/deb/usr/share/xdm/
+          
+          # Create symlink launcher
+          ln -s /usr/share/xdm/XDM.Desktop publish/deb/usr/bin/xdm-app
+          
+          # Write control file
+          cat <<EOF > publish/deb/DEBIAN/control
+          Package: xdm-rebirth
+          Version: 8.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Antigravity Team
+          Description: Xtreme Download Manager Rebirth - Blazing fast modern download accelerator.
+          EOF
+          
+          # Build .deb package
+          dpkg-deb --build publish/deb dist/xdm-linux-amd64.deb
+
+      # ==========================================
+      # MACOS BUILD PIPELINE (Universal Binaries)
+      # ==========================================
+      - name: Restore & Publish macOS Build (Intel + Apple Silicon)
+        if: matrix.os == 'macos-latest'
+        run: |
+          dotnet restore app/XDM/XDM.sln
+          
+          # Publish Intel x64
+          dotnet publish app/XDM/XDM.Desktop/XDM.Desktop.csproj -c Release -r osx-x64 --self-contained true -o publish/osx-x64/app
+          dotnet publish app/XDM/XDM.MessagingHost/XDM.MessagingHost.csproj -c Release -r osx-x64 --self-contained true -o publish/osx-x64/host
+          
+          # Publish Apple Silicon ARM64
+          dotnet publish app/XDM/XDM.Desktop/XDM.Desktop.csproj -c Release -r osx-arm64 --self-contained true -o publish/osx-arm64/app
+          dotnet publish app/XDM/XDM.MessagingHost/XDM.MessagingHost.csproj -c Release -r osx-arm64 --self-contained true -o publish/osx-arm64/host
+
+      - name: Create Universal Binaries (lipo)
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p publish/osx-universal/app
+          mkdir -p publish/osx-universal/host
+          
+          # Copy app bundle structure from arm64 template
+          cp -R publish/osx-arm64/app/* publish/osx-universal/app/
+          cp -R publish/osx-arm64/host/* publish/osx-universal/host/
+          
+          # Merge executable binaries using lipo
+          lipo -create publish/osx-x64/app/XDM.Desktop publish/osx-arm64/app/XDM.Desktop -output publish/osx-universal/app/XDM.Desktop
+          lipo -create publish/osx-x64/host/xdm-app-host publish/osx-arm64/host/xdm-app-host -output publish/osx-universal/host/xdm-app-host
+
+      - name: Package macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir dist
+          hdiutil create -volname "XDM Rebirth" -srcfolder publish/osx-universal/app -ov -format UDZO dist/xdm-macos-universal.dmg
+
+      # ==========================================
+      # ARTIFACT UPLOADS
+      # ==========================================
+      - name: Upload Desktop Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdm-desktop-${{ matrix.os }}
+          path: dist/

@@ -1,38 +1,98 @@
-﻿using MediaParser.YouTube;
+using MediaParser.YouTube;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using XDM.Core.MediaParser.YouTube;
 using YDLWrapper;
 
 namespace XDM.SystemTests
 {
-
     class JsonTest
     {
         [Test]
         public void ProcessJson()
         {
-            var res1 = YDLOutputParser.Parse(@"C:\Users\subhrad\Desktop\80a44682-5ea8-4193-bc52-34ee568ce9bb.json");
-            Console.WriteLine(JsonConvert.SerializeObject(res1));
-
-            //var res2 = YDLOutputParser.Parse(@"C:\Users\subhro\Desktop\ccc39b43-0fd1-464d-ba11-d608242dcdc2.json");
-            //Console.WriteLine(JsonConvert.SerializeObject(res2));
+            string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+            try
+            {
+                string json = @"{
+                    ""title"": ""Test Video"",
+                    ""formats"": [
+                        {
+                            ""url"": ""https://example.com/video.mp4"",
+                            ""format"": ""137 - 1920x1080 (1080p)"",
+                            ""ext"": ""mp4"",
+                            ""vcodec"": ""h264"",
+                            ""acodec"": ""aac"",
+                            ""width"": ""1920"",
+                            ""height"": ""1080""
+                        }
+                    ]
+                }";
+                File.WriteAllText(tempFile, json);
+                var res1 = YDLOutputParser.Parse(tempFile);
+                Assert.That(res1, Is.Not.Null);
+            }
+            finally
+            {
+                if (File.Exists(tempFile))
+                {
+                    try { File.Delete(tempFile); } catch { }
+                }
+            }
         }
 
         [Test]
         public void ProcessYtJson()
         {
-            var item = YoutubeDataFormatParser.GetFormats(@"C:\Users\subhrad\Desktop\159_.json");
-            Console.WriteLine(item.DualVideoItems.Count + " " + item.VideoItems.Count);
-            foreach(var a in item.DualVideoItems)
+            string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+            try
             {
-                Console.WriteLine(a.FormatDescription);
+                string json = @"{
+                    ""streamingData"": {
+                        ""formats"": [
+                            {
+                                ""url"": ""https://example.com/muxed.mp4"",
+                                ""mimeType"": ""video/mp4; codecs=\""avc1.64001F, mp4a.40.2\"""",
+                                ""qualityLabel"": ""720p"",
+                                ""contentLength"": 5000000
+                            }
+                        ],
+                        ""adaptiveFormats"": [
+                            {
+                                ""url"": ""https://example.com/video-only.mp4"",
+                                ""mimeType"": ""video/mp4; codecs=\""avc1.64001F\"""",
+                                ""qualityLabel"": ""1080p"",
+                                ""contentLength"": 4000000,
+                                ""bitrate"": 2000000
+                            },
+                            {
+                                ""url"": ""https://example.com/audio-only.mp4"",
+                                ""mimeType"": ""audio/mp4; codecs=\""mp4a.40.2\"""",
+                                ""qualityLabel"": ""140"",
+                                ""contentLength"": 1000000,
+                                ""bitrate"": 128000
+                            }
+                        ]
+                    },
+                    ""videoDetails"": {
+                        ""title"": ""Sample YouTube Video""
+                    }
+                }";
+                File.WriteAllText(tempFile, json);
+                var item = YoutubeDataFormatParser.GetFormats(tempFile);
+                Assert.That(item.Key, Is.Not.Null);
+                Assert.That(item.Value, Is.Not.Null);
+                Assert.That(item.Key.Count, Is.GreaterThan(0));
+            }
+            finally
+            {
+                if (File.Exists(tempFile))
+                {
+                    try { File.Delete(tempFile); } catch { }
+                }
             }
         }
     }

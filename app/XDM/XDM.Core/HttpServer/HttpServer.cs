@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -39,7 +39,7 @@ namespace XDM.Core.HttpServer
 
         private void ProcessRequest(TcpClient tcp)
         {
-            new Thread(() =>
+            Task.Run(() =>
             {
                 try
                 {
@@ -61,7 +61,7 @@ namespace XDM.Core.HttpServer
                 {
                     try { tcp.Close(); } catch { }
                 }
-            }).Start();
+            });
         }
     }
 }

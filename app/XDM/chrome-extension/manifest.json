@@ -15,10 +15,11 @@
         "storage",
         "contextMenus",
         "alarms",
-        "scripting"
+        "scripting",
+        "nativeMessaging"
     ],
     "background": {
-        "service_worker": "main.js",
+        "service_worker": "background.js",
         "type": "module"
     },
     "icons": {
